@@ -11,8 +11,11 @@ export default function TenantDiffsPage() {
   const [customerLabel, setCustomerLabel] = useState('');
   const [sourceEnvironmentId, setSourceEnvironmentId] = useState('');
   const [targetEnvironmentId, setTargetEnvironmentId] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState('');
   const [packageStatusFilter, setPackageStatusFilter] = useState<PackageStatusFilter>('all');
   const [iflowStatusFilter, setIflowStatusFilter] = useState<IflowStatusFilter>('all');
+  const [packageNameFilter, setPackageNameFilter] = useState('all');
+  const [iflowPackageFilter, setIflowPackageFilter] = useState('all');
   const [packageSearch, setPackageSearch] = useState('');
   const [iflowSearch, setIflowSearch] = useState('');
   const [presetName, setPresetName] = useState('');
@@ -44,6 +47,36 @@ export default function TenantDiffsPage() {
 
   const diffResult = compareMut.data;
 
+  const tenantDiffPresets = useMemo(
+    () => presets.filter((p) => (p.payload as { kind?: string })?.kind === 'tenant-diff'),
+    [presets]
+  );
+
+  const packageOptions = useMemo(() => {
+    if (!diffResult) return [] as string[];
+    const names = new Set<string>();
+    diffResult.packages.notTransported.forEach((x) => names.add(x.name));
+    diffResult.packages.synced.forEach((x) => names.add(x.name));
+    diffResult.packages.onlyInTarget.forEach((x) => names.add(x.name));
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [diffResult]);
+
+  const iflowPackageOptions = useMemo(() => {
+    if (!diffResult) return [] as string[];
+    const names = new Set<string>();
+    const allIflows = [
+      ...diffResult.iflows.notTransported,
+      ...diffResult.iflows.versionMismatch,
+      ...diffResult.iflows.synced,
+      ...diffResult.iflows.onlyInTarget,
+    ];
+    allIflows.forEach((x) => {
+      if (x.sourcePackageId) names.add(x.sourcePackageId);
+      if (x.targetPackageId) names.add(x.targetPackageId);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [diffResult]);
+
   const packageRows = useMemo(() => {
     if (!diffResult) return [] as Array<TenantDiffPackageItem & { status: PackageStatusFilter }>;
 
@@ -56,14 +89,15 @@ export default function TenantDiffsPage() {
     const q = packageSearch.trim().toLowerCase();
     return rows.filter((row) => {
       const matchStatus = packageStatusFilter === 'all' || row.status === packageStatusFilter;
+      const matchPackage = packageNameFilter === 'all' || row.name === packageNameFilter;
       const matchSearch =
         !q ||
         row.name.toLowerCase().includes(q) ||
         (row.sourceVersion ?? '').toLowerCase().includes(q) ||
         (row.targetVersion ?? '').toLowerCase().includes(q);
-      return matchStatus && matchSearch;
+      return matchStatus && matchPackage && matchSearch;
     });
-  }, [diffResult, packageSearch, packageStatusFilter]);
+  }, [diffResult, packageSearch, packageStatusFilter, packageNameFilter]);
 
   const iflowRows = useMemo(() => {
     if (!diffResult) return [] as Array<TenantDiffIflowItem & { status: IflowStatusFilter }>;
@@ -78,6 +112,10 @@ export default function TenantDiffsPage() {
     const q = iflowSearch.trim().toLowerCase();
     return rows.filter((row) => {
       const matchStatus = iflowStatusFilter === 'all' || row.status === iflowStatusFilter;
+      const matchPackage =
+        iflowPackageFilter === 'all' ||
+        row.sourcePackageId === iflowPackageFilter ||
+        row.targetPackageId === iflowPackageFilter;
       const matchSearch =
         !q ||
         row.name.toLowerCase().includes(q) ||
@@ -85,9 +123,9 @@ export default function TenantDiffsPage() {
         (row.targetVersion ?? '').toLowerCase().includes(q) ||
         (row.sourcePackageId ?? '').toLowerCase().includes(q) ||
         (row.targetPackageId ?? '').toLowerCase().includes(q);
-      return matchStatus && matchSearch;
+      return matchStatus && matchPackage && matchSearch;
     });
-  }, [diffResult, iflowSearch, iflowStatusFilter]);
+  }, [diffResult, iflowSearch, iflowStatusFilter, iflowPackageFilter]);
 
   function runCompare() {
     compareMut.mutate({
@@ -107,6 +145,8 @@ export default function TenantDiffsPage() {
         targetEnvironmentId,
         packageStatusFilter,
         iflowStatusFilter,
+        packageNameFilter,
+        iflowPackageFilter,
       },
     });
   }
@@ -120,6 +160,8 @@ export default function TenantDiffsPage() {
       targetEnvironmentId?: string;
       packageStatusFilter?: PackageStatusFilter;
       iflowStatusFilter?: IflowStatusFilter;
+      packageNameFilter?: string;
+      iflowPackageFilter?: string;
     };
 
     if (p.kind !== 'tenant-diff') return;
@@ -129,6 +171,16 @@ export default function TenantDiffsPage() {
     if (p.targetEnvironmentId) setTargetEnvironmentId(p.targetEnvironmentId);
     if (p.packageStatusFilter) setPackageStatusFilter(p.packageStatusFilter);
     if (p.iflowStatusFilter) setIflowStatusFilter(p.iflowStatusFilter);
+    if (p.packageNameFilter) setPackageNameFilter(p.packageNameFilter);
+    if (p.iflowPackageFilter) setIflowPackageFilter(p.iflowPackageFilter);
+  }
+
+  function onPresetSelect(presetId: string) {
+    setSelectedPresetId(presetId);
+    if (!presetId) return;
+    const selected = tenantDiffPresets.find((p) => p.id === presetId);
+    if (!selected) return;
+    applyDiffPreset(selected.payload);
   }
 
   return (
@@ -194,13 +246,19 @@ export default function TenantDiffsPage() {
             Save diff preset
           </button>
 
-          {presets
-            .filter((p) => (p.payload as { kind?: string })?.kind === 'tenant-diff')
-            .map((p) => (
-              <button key={p.id} className="btn btn-ghost" onClick={() => applyDiffPreset(p.payload)}>
-                Apply: {p.name}
-              </button>
+          <select
+            className="field"
+            value={selectedPresetId}
+            onChange={(e) => onPresetSelect(e.target.value)}
+            style={{ minWidth: 240 }}
+          >
+            <option value="">Apply diff preset...</option>
+            {tenantDiffPresets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
+          </select>
         </div>
       </div>
 
@@ -208,12 +266,18 @@ export default function TenantDiffsPage() {
 
       <div className="panel" style={{ borderRadius: 6, padding: 12, display: 'grid', gap: 10 }}>
         <div style={{ fontWeight: 600 }}>Packages</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 260px 1fr', gap: 8 }}>
           <select className="field" value={packageStatusFilter} onChange={(e) => setPackageStatusFilter(e.target.value as PackageStatusFilter)}>
             <option value="all">All statuses</option>
             <option value="notTransported">Not transported</option>
             <option value="synced">Synced</option>
             <option value="onlyInTarget">Only in target</option>
+          </select>
+          <select className="field" value={packageNameFilter} onChange={(e) => setPackageNameFilter(e.target.value)}>
+            <option value="all">All packages</option>
+            {packageOptions.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
           </select>
           <input className="field" placeholder="Filter packages" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />
         </div>
@@ -222,13 +286,19 @@ export default function TenantDiffsPage() {
 
       <div className="panel" style={{ borderRadius: 6, padding: 12, display: 'grid', gap: 10 }}>
         <div style={{ fontWeight: 600 }}>Integration Flows</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 260px 1fr', gap: 8 }}>
           <select className="field" value={iflowStatusFilter} onChange={(e) => setIflowStatusFilter(e.target.value as IflowStatusFilter)}>
             <option value="all">All statuses</option>
             <option value="notTransported">Not transported</option>
             <option value="versionMismatch">Version mismatch</option>
             <option value="synced">Synced</option>
             <option value="onlyInTarget">Only in target</option>
+          </select>
+          <select className="field" value={iflowPackageFilter} onChange={(e) => setIflowPackageFilter(e.target.value)}>
+            <option value="all">All packages</option>
+            {iflowPackageOptions.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
           </select>
           <input className="field" placeholder="Filter iflows" value={iflowSearch} onChange={(e) => setIflowSearch(e.target.value)} />
         </div>
