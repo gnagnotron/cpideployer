@@ -49,6 +49,29 @@ Steps:
    - API: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ENCRYPTION_KEY`, `CORS_ORIGIN`
    - WEB: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`
 
+## 4b) Render free-tier single service (recommended if Blueprint asks payment)
+
+You can deploy with only one Render Web Service.
+
+Service config:
+- Type: Web Service
+- Root Directory: repository root
+- Build Command: `npm ci && npm run build`
+- Start Command: `npm run start`
+
+Environment variables for this single service:
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
+- `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`)
+- `APP_ENCRYPTION_KEY`
+- `CORS_ORIGIN` (set it to your Render app URL)
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` (or `VITE_SUPABASE_ANON_KEY`)
+
+Notes:
+- Backend now serves frontend static files from `frontend/dist` after build.
+- Keep `VITE_API_BASE_URL` empty in single-service mode, so frontend uses same-origin `/api`.
+
 ## 5) Data model and security summary
 
 - Auth: Supabase Auth (email/password + OAuth)

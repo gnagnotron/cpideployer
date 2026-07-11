@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import apiRouter from './routes/api';
 import appV1Router from './routes/app-v1';
 import { env } from './config/env';
@@ -16,6 +18,18 @@ app.use(express.json({ limit: '2mb' }));
 
 app.use('/api', apiRouter);
 app.use('/api/v1', appV1Router);
+
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
+
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    return res.sendFile(frontendIndexPath);
+  });
+}
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
