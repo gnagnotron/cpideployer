@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import EnvironmentsPage from './pages/EnvironmentsPage';
 import PresetsPage from './pages/PresetsPage';
 import AdminPage from './pages/AdminPage';
+import OperationsPage from './pages/OperationsPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './auth/AuthProvider';
 import {
@@ -15,6 +16,7 @@ import { useMemo, useState } from 'react';
 
 const navItems = [
   { to: '/', label: 'Environments', end: true },
+  { to: '/operations', label: 'Operations', end: false },
   { to: '/presets', label: 'Presets', end: false },
   { to: '/admin', label: 'Backoffice', end: false },
 ];
@@ -96,7 +98,7 @@ export default function App() {
             SAP Integration Suite
           </div>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--amber)', letterSpacing: '-0.02em' }}>
-            Mapping Copilot
+            Bulk Deployer
           </div>
         </div>
 
@@ -166,6 +168,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<EnvironmentsPage />} />
           <Route path="/environments" element={<EnvironmentsPage />} />
+          <Route path="/operations" element={<OperationsPage />} />
           <Route path="/presets" element={<PresetsPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>

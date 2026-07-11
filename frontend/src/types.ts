@@ -156,3 +156,33 @@ export interface OrganizationMember {
   email: string | null;
   fullName: string | null;
 }
+
+export type ArtifactType =
+  | 'IntegrationFlow'
+  | 'ValueMapping'
+  | 'ScriptCollection'
+  | 'MessageMapping';
+
+export interface IntegrationPackage {
+  Id: string;
+  Name: string;
+  Description?: string;
+  Version?: string;
+}
+
+export interface DesigntimeArtifact {
+  Id: string;
+  Version: string;
+  PackageId: string;
+  Name: string;
+  Type: ArtifactType;
+}
+
+export interface RuntimeArtifact {
+  Id: string;
+  Version: string;
+  Name: string;
+  Type: string;
+  Status: 'STARTED' | 'STARTING' | 'ERROR' | 'STOPPING' | 'STOPPED';
+  ErrorInformation?: { LastErrorMessage: string };
+}

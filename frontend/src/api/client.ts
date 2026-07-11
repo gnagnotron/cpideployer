@@ -12,6 +12,9 @@ import type {
   OrganizationMember,
   OrgRole,
   PresetItem,
+  DesigntimeArtifact,
+  IntegrationPackage,
+  RuntimeArtifact,
 } from '../types';
 
 const legacyApi = axios.create({
@@ -137,3 +140,43 @@ export const updateOrganizationMemberRole = (
   role: OrgRole
 ): Promise<{ id: string; role: OrgRole }> =>
   appApi.patch<{ id: string; role: OrgRole }>(`/admin/members/${memberId}/role`, { role }).then((r) => r.data);
+
+export const listCpiPackages = (environmentId: string): Promise<IntegrationPackage[]> =>
+  appApi
+    .get<IntegrationPackage[]>('/cpi/packages', { params: { environmentId } })
+    .then((r) => r.data);
+
+export const listCpiArtifacts = (
+  environmentId: string,
+  packageId?: string
+): Promise<DesigntimeArtifact[]> =>
+  appApi
+    .get<DesigntimeArtifact[]>('/cpi/artifacts', { params: { environmentId, packageId } })
+    .then((r) => r.data);
+
+export const listCpiRuntimeArtifacts = (environmentId: string): Promise<RuntimeArtifact[]> =>
+  appApi
+    .get<RuntimeArtifact[]>('/cpi/runtime-artifacts', { params: { environmentId } })
+    .then((r) => r.data);
+
+export const deployCpiArtifacts = (
+  environmentId: string,
+  artifacts: Array<{ id: string; version: string; type?: string }>
+): Promise<Array<{ id: string; status: 'success' | 'error'; message?: string }>> =>
+  appApi
+    .post<Array<{ id: string; status: 'success' | 'error'; message?: string }>>('/cpi/deploy', {
+      environmentId,
+      artifacts,
+    })
+    .then((r) => r.data);
+
+export const undeployCpiArtifacts = (
+  environmentId: string,
+  artifactIds: string[]
+): Promise<Array<{ id: string; status: 'success' | 'error'; message?: string }>> =>
+  appApi
+    .post<Array<{ id: string; status: 'success' | 'error'; message?: string }>>('/cpi/undeploy', {
+      environmentId,
+      artifactIds,
+    })
+    .then((r) => r.data);
