@@ -108,6 +108,21 @@ export default function PresetsPage() {
 }
 
 function PresetSummary({ item }: { item: PresetItem }) {
+  const diff = parseTenantDiffPayload(item.payload);
+  if (diff.ok) {
+    return (
+      <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <span className="badge badge-amber">tenant diff</span>
+          <span className="badge badge-gray">customer: {diff.customerLabel ?? 'n/a'}</span>
+        </div>
+        <div style={{ color: 'var(--text-mid)', fontSize: 12 }}>
+          Source: {diff.sourceEnvironmentId} | Target: {diff.targetEnvironmentId}
+        </div>
+      </div>
+    );
+  }
+
   const parsed = parsePresetPayload(item.payload);
 
   if (!parsed.ok) {
@@ -160,5 +175,34 @@ function parsePresetPayload(payload: unknown):
     environmentId: value.environmentId ?? null,
     environmentName: value.environmentName ?? null,
     artifactIds: value.artifactIds,
+  };
+}
+
+function parseTenantDiffPayload(payload: unknown):
+  | {
+      ok: true;
+      customerLabel: string | null;
+      sourceEnvironmentId: string;
+      targetEnvironmentId: string;
+    }
+  | { ok: false } {
+  if (!payload || typeof payload !== 'object') return { ok: false };
+
+  const value = payload as {
+    kind?: string;
+    customerLabel?: string | null;
+    sourceEnvironmentId?: string;
+    targetEnvironmentId?: string;
+  };
+
+  if (value.kind !== 'tenant-diff' || !value.sourceEnvironmentId || !value.targetEnvironmentId) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    customerLabel: value.customerLabel ?? null,
+    sourceEnvironmentId: value.sourceEnvironmentId,
+    targetEnvironmentId: value.targetEnvironmentId,
   };
 }

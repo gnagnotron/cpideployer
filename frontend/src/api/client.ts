@@ -15,6 +15,7 @@ import type {
   DesigntimeArtifact,
   IntegrationPackage,
   RuntimeArtifact,
+  TenantDiffResult,
 } from '../types';
 
 const legacyApi = axios.create({
@@ -180,3 +181,10 @@ export const undeployCpiArtifacts = (
       artifactIds,
     })
     .then((r) => r.data);
+
+export const compareTenants = (payload: {
+  sourceEnvironmentId: string;
+  targetEnvironmentId: string;
+  customerLabel?: string;
+}): Promise<TenantDiffResult> =>
+  appApi.post<TenantDiffResult>('/cpi/tenant-diff', payload).then((r) => r.data);

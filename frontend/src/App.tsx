@@ -4,6 +4,7 @@ import EnvironmentsPage from './pages/EnvironmentsPage';
 import PresetsPage from './pages/PresetsPage';
 import AdminPage from './pages/AdminPage';
 import OperationsPage from './pages/OperationsPage';
+import TenantDiffsPage from './pages/TenantDiffsPage';
 import AccountPage from './pages/AccountPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './auth/AuthProvider';
@@ -20,6 +21,7 @@ type NavItem = { to: string; label: string; end: boolean; adminOnly?: boolean };
 const navItems: NavItem[] = [
   { to: '/', label: 'Environments', end: true },
   { to: '/operations', label: 'Operations', end: false },
+  { to: '/tenant-diffs', label: 'Tenant Diffs', end: false },
   { to: '/presets', label: 'Presets', end: false },
   { to: '/account', label: 'Account', end: false },
   { to: '/admin', label: 'Backoffice', end: false, adminOnly: true },
@@ -179,6 +181,7 @@ export default function App() {
             <Route path="/" element={<EnvironmentsPage />} />
             <Route path="/environments" element={<EnvironmentsPage />} />
             <Route path="/operations" element={<OperationsPage />} />
+            <Route path="/tenant-diffs" element={<TenantDiffsPage />} />
             <Route path="/presets" element={<PresetsPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/admin" element={canAccessAdmin ? <AdminPage /> : <UnauthorizedPage />} />

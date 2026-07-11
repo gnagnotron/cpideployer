@@ -248,6 +248,89 @@ router.get('/cpi/runtime-artifacts', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/cpi/tenant-diff', async (req: Request, res: Response) => {
+  const { sourceEnvironmentId, targetEnvironmentId, customerLabel } = req.body as {
+    sourceEnvironmentId?: string;
+    targetEnvironmentId?: string;
+    customerLabel?: string;
+  };
+
+  if (!sourceEnvironmentId || !targetEnvironmentId) {
+    return res.status(400).json({ error: 'sourceEnvironmentId and targetEnvironmentId are required' });
+  }
+
+  const startedAt = Date.now();
+
+  try {
+    const [sourceEnv, targetEnv] = await Promise.all([
+      loadEnvironmentInfo(req, sourceEnvironmentId),
+      loadEnvironmentInfo(req, targetEnvironmentId),
+    ]);
+
+    const [sourcePackagesRaw, targetPackagesRaw, sourceArtifactsRaw, targetArtifactsRaw] = await Promise.all([
+      cpiGet<{ d?: { results?: PackageItem[] } }>(sourceEnv.tenant, 'IntegrationPackages'),
+      cpiGet<{ d?: { results?: PackageItem[] } }>(targetEnv.tenant, 'IntegrationPackages'),
+      getAllArtifacts(sourceEnv.tenant),
+      getAllArtifacts(targetEnv.tenant),
+    ]);
+
+    const sourcePackages = sourcePackagesRaw.d?.results ?? [];
+    const targetPackages = targetPackagesRaw.d?.results ?? [];
+
+    const sourceIflows = toIflowItems(sourceArtifactsRaw);
+    const targetIflows = toIflowItems(targetArtifactsRaw);
+
+    const packageDiff = comparePackages(sourcePackages, targetPackages);
+    const iflowDiff = compareIflows(sourceIflows, targetIflows);
+
+    const durationSeconds = ((Date.now() - startedAt) / 1000).toFixed(2);
+
+    await writeAudit(req, 'compare_tenants', 'tenant_diff', `${sourceEnvironmentId}->${targetEnvironmentId}`, {
+      customerLabel: customerLabel ?? null,
+      sourceEnvironmentId,
+      targetEnvironmentId,
+      durationSeconds,
+      sourcePackages: sourcePackages.length,
+      targetPackages: targetPackages.length,
+      sourceIflows: sourceIflows.length,
+      targetIflows: targetIflows.length,
+    });
+
+    return res.json({
+      summary: {
+        sourcePackages: sourcePackages.length,
+        targetPackages: targetPackages.length,
+        sourceIflows: sourceIflows.length,
+        targetIflows: targetIflows.length,
+        packageNotTransported: packageDiff.notTransported.length,
+        packageSynced: packageDiff.synced.length,
+        packageOnlyInTarget: packageDiff.onlyInTarget.length,
+        iflowNotTransported: iflowDiff.notTransported.length,
+        iflowVersionMismatch: iflowDiff.versionMismatch.length,
+        iflowSynced: iflowDiff.synced.length,
+        iflowOnlyInTarget: iflowDiff.onlyInTarget.length,
+      },
+      packages: packageDiff,
+      iflows: iflowDiff,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        durationSeconds,
+        customerLabel: customerLabel ?? null,
+        source: {
+          environmentId: sourceEnv.id,
+          environmentName: sourceEnv.name,
+        },
+        target: {
+          environmentId: targetEnv.id,
+          environmentName: targetEnv.name,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 router.post('/cpi/deploy', async (req: Request, res: Response) => {
   const { environmentId, artifacts } = req.body as {
     environmentId?: string;
@@ -511,6 +594,35 @@ type TenantContext = {
   clientSecret: string;
 };
 
+type PackageItem = {
+  Id: string;
+  Name: string;
+  Version?: string;
+};
+
+type IflowItem = {
+  Id: string;
+  Name: string;
+  Version: string;
+  PackageId: string;
+};
+
+type PackageCompareItem = {
+  name: string;
+  sourceVersion?: string;
+  targetVersion?: string;
+};
+
+type IflowCompareItem = {
+  name: string;
+  sourceVersion?: string;
+  targetVersion?: string;
+  sourceId?: string;
+  targetId?: string;
+  sourcePackageId?: string;
+  targetPackageId?: string;
+};
+
 type CpiArtifactType = 'IntegrationFlow' | 'ValueMapping' | 'ScriptCollection' | 'MessageMapping';
 
 const DESIGNTIME_TYPES: CpiArtifactType[] = [
@@ -550,6 +662,39 @@ async function loadTenantContext(req: Request, environmentId: string): Promise<T
     tokenUrl: (data.token_url as string).replace(/\/$/, ''),
     clientId: data.client_id as string,
     clientSecret: parsed.clientSecret,
+  };
+}
+
+async function loadEnvironmentInfo(
+  req: Request,
+  environmentId: string
+): Promise<{ id: string; name: string; tenant: TenantContext }> {
+  const { data, error } = await supabaseAdminClient
+    .from('environments')
+    .select('id, name, base_url, token_url, client_id, service_key_enc')
+    .eq('id', environmentId)
+    .eq('organization_id', req.org!.id)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? 'Environment not found');
+  }
+
+  const serviceKeyRaw = decryptSecret(data.service_key_enc as string);
+  const parsed = parseServiceKeyForSecret(serviceKeyRaw);
+  if (!parsed.clientSecret) {
+    throw new Error(`Service key for environment ${data.name as string} does not contain client secret`);
+  }
+
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    tenant: {
+      baseUrl: (data.base_url as string).replace(/\/$/, ''),
+      tokenUrl: (data.token_url as string).replace(/\/$/, ''),
+      clientId: data.client_id as string,
+      clientSecret: parsed.clientSecret,
+    },
   };
 }
 
@@ -750,6 +895,110 @@ async function getAllArtifacts(tenant: TenantContext, packageId?: string): Promi
   }
 
   return all;
+}
+
+function toIflowItems(input: unknown[]): IflowItem[] {
+  return input
+    .map((row) => row as { Type?: string; Id?: string; Name?: string; Version?: string; PackageId?: string })
+    .filter((row) => row.Type === 'IntegrationFlow' && !!row.Id && !!row.Name && !!row.Version)
+    .map((row) => ({
+      Id: row.Id as string,
+      Name: row.Name as string,
+      Version: row.Version as string,
+      PackageId: (row.PackageId as string | undefined) ?? '',
+    }));
+}
+
+function comparePackages(sourcePackages: PackageItem[], targetPackages: PackageItem[]) {
+  const targetByName = new Map<string, PackageItem>();
+  for (const item of targetPackages) targetByName.set(item.Name, item);
+
+  const sourceByName = new Map<string, PackageItem>();
+  for (const item of sourcePackages) sourceByName.set(item.Name, item);
+
+  const notTransported: PackageCompareItem[] = [];
+  const synced: PackageCompareItem[] = [];
+  const onlyInTarget: PackageCompareItem[] = [];
+
+  for (const source of sourcePackages) {
+    const target = targetByName.get(source.Name);
+    if (!target) {
+      notTransported.push({ name: source.Name, sourceVersion: source.Version });
+    } else {
+      synced.push({ name: source.Name, sourceVersion: source.Version, targetVersion: target.Version });
+    }
+  }
+
+  for (const target of targetPackages) {
+    const source = sourceByName.get(target.Name);
+    if (!source) {
+      onlyInTarget.push({ name: target.Name, targetVersion: target.Version });
+    }
+  }
+
+  return { notTransported, synced, onlyInTarget };
+}
+
+function compareIflows(sourceIflows: IflowItem[], targetIflows: IflowItem[]) {
+  const targetByName = new Map<string, IflowItem>();
+  for (const item of targetIflows) targetByName.set(item.Name, item);
+
+  const sourceByName = new Map<string, IflowItem>();
+  for (const item of sourceIflows) sourceByName.set(item.Name, item);
+
+  const notTransported: IflowCompareItem[] = [];
+  const versionMismatch: IflowCompareItem[] = [];
+  const synced: IflowCompareItem[] = [];
+  const onlyInTarget: IflowCompareItem[] = [];
+
+  for (const source of sourceIflows) {
+    const target = targetByName.get(source.Name);
+    if (!target) {
+      notTransported.push({
+        name: source.Name,
+        sourceVersion: source.Version,
+        sourceId: source.Id,
+        sourcePackageId: source.PackageId,
+      });
+      continue;
+    }
+
+    if (source.Version === target.Version) {
+      synced.push({
+        name: source.Name,
+        sourceVersion: source.Version,
+        targetVersion: target.Version,
+        sourceId: source.Id,
+        targetId: target.Id,
+        sourcePackageId: source.PackageId,
+        targetPackageId: target.PackageId,
+      });
+    } else {
+      versionMismatch.push({
+        name: source.Name,
+        sourceVersion: source.Version,
+        targetVersion: target.Version,
+        sourceId: source.Id,
+        targetId: target.Id,
+        sourcePackageId: source.PackageId,
+        targetPackageId: target.PackageId,
+      });
+    }
+  }
+
+  for (const target of targetIflows) {
+    const source = sourceByName.get(target.Name);
+    if (!source) {
+      onlyInTarget.push({
+        name: target.Name,
+        targetVersion: target.Version,
+        targetId: target.Id,
+        targetPackageId: target.PackageId,
+      });
+    }
+  }
+
+  return { notTransported, versionMismatch, synced, onlyInTarget };
 }
 
 async function getPackageIds(tenant: TenantContext): Promise<string[]> {

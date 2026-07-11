@@ -186,3 +186,59 @@ export interface RuntimeArtifact {
   Status: 'STARTED' | 'STARTING' | 'ERROR' | 'STOPPING' | 'STOPPED';
   ErrorInformation?: { LastErrorMessage: string };
 }
+
+export interface TenantDiffPackageItem {
+  name: string;
+  sourceVersion?: string;
+  targetVersion?: string;
+}
+
+export interface TenantDiffIflowItem {
+  name: string;
+  sourceVersion?: string;
+  targetVersion?: string;
+  sourceId?: string;
+  targetId?: string;
+  sourcePackageId?: string;
+  targetPackageId?: string;
+}
+
+export interface TenantDiffResult {
+  summary: {
+    sourcePackages: number;
+    targetPackages: number;
+    sourceIflows: number;
+    targetIflows: number;
+    packageNotTransported: number;
+    packageSynced: number;
+    packageOnlyInTarget: number;
+    iflowNotTransported: number;
+    iflowVersionMismatch: number;
+    iflowSynced: number;
+    iflowOnlyInTarget: number;
+  };
+  packages: {
+    notTransported: TenantDiffPackageItem[];
+    synced: TenantDiffPackageItem[];
+    onlyInTarget: TenantDiffPackageItem[];
+  };
+  iflows: {
+    notTransported: TenantDiffIflowItem[];
+    versionMismatch: TenantDiffIflowItem[];
+    synced: TenantDiffIflowItem[];
+    onlyInTarget: TenantDiffIflowItem[];
+  };
+  metadata: {
+    timestamp: string;
+    durationSeconds: string;
+    customerLabel: string | null;
+    source: {
+      environmentId: string;
+      environmentName: string;
+    };
+    target: {
+      environmentId: string;
+      environmentName: string;
+    };
+  };
+}
