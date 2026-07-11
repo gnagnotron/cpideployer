@@ -25,6 +25,7 @@ export default function OperationsPage() {
     queryKey: ['environments'],
     queryFn: listEnvironments,
   });
+  const selectedEnvironment = environments.find((env) => env.id === environmentId) ?? null;
 
   const { data: packages = [] } = useQuery({
     queryKey: ['cpi-packages', environmentId],
@@ -82,6 +83,8 @@ export default function OperationsPage() {
       const selected = artifacts.filter((a) => selectedIds.has(a.Id));
       const payload = {
         kind: 'artifact-bulk-selection',
+        environmentId,
+        environmentName: selectedEnvironment?.name ?? null,
         artifactIds: selected.map((a) => ({ id: a.Id, type: a.Type as ArtifactType })),
       };
       return createPreset({ name: presetName, payload });
@@ -116,8 +119,15 @@ export default function OperationsPage() {
   }
 
   function applyPreset(item: PresetItem) {
-    const payload = item.payload as { kind?: string; artifactIds?: Array<{ id: string; type?: string }> };
+    const payload = item.payload as {
+      kind?: string;
+      environmentId?: string;
+      artifactIds?: Array<{ id: string; type?: string }>;
+    };
     if (payload?.kind !== 'artifact-bulk-selection' || !Array.isArray(payload.artifactIds)) return;
+    if (payload.environmentId) {
+      setEnvironmentId(payload.environmentId);
+    }
     const next = new Set(payload.artifactIds.map((x) => x.id));
     setSelectedIds(next);
     setOpSummary(`Preset applied: ${item.name} (${next.size} selected)`);

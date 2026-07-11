@@ -399,7 +399,7 @@ router.get('/audit', requireOrgRoles(['owner', 'admin']), async (req: Request, r
   return res.json(data ?? []);
 });
 
-router.get('/admin/members', requireOrgRoles(['owner', 'admin']), async (req: Request, res: Response) => {
+router.get('/admin/members', async (req: Request, res: Response) => {
   const { data, error } = await supabaseAdminClient
     .from('organization_members')
     .select('id, role, created_at, user_id, profiles(full_name, email)')

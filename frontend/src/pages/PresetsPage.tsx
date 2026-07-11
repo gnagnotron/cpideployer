@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPreset, deletePreset, listPresets } from '../api/client';
+import type { PresetItem } from '../types';
 
 export default function PresetsPage() {
   const qc = useQueryClient();
@@ -12,6 +13,7 @@ export default function PresetsPage() {
   const [name, setName] = useState('');
   const [payloadText, setPayloadText] = useState('{\n  "example": true\n}');
   const [error, setError] = useState<string | null>(null);
+  const [openJsonById, setOpenJsonById] = useState<Record<string, boolean>>({});
 
   const createMut = useMutation({
     mutationFn: createPreset,
@@ -72,17 +74,91 @@ export default function PresetsPage() {
                   Updated {new Date(item.updated_at).toLocaleString('it-IT')}
                 </div>
               </div>
-              <button className="btn btn-danger" onClick={() => deleteMut.mutate(item.id)}>Delete</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() =>
+                    setOpenJsonById((prev) => ({
+                      ...prev,
+                      [item.id]: !prev[item.id],
+                    }))
+                  }
+                >
+                  {openJsonById[item.id] ? 'Hide JSON' : 'Show JSON'}
+                </button>
+                <button className="btn btn-danger" onClick={() => deleteMut.mutate(item.id)}>Delete</button>
+              </div>
             </div>
-            <pre
-              className="mono"
-              style={{ margin: 0, overflow: 'auto', background: 'var(--bg-base)', padding: 10, borderRadius: 4 }}
-            >
-              {JSON.stringify(item.payload, null, 2)}
-            </pre>
+
+            <PresetSummary item={item} />
+
+            {openJsonById[item.id] && (
+              <pre
+                className="mono"
+                style={{ margin: 0, overflow: 'auto', background: 'var(--bg-base)', padding: 10, borderRadius: 4, marginTop: 10 }}
+              >
+                {JSON.stringify(item.payload, null, 2)}
+              </pre>
+            )}
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function PresetSummary({ item }: { item: PresetItem }) {
+  const parsed = parsePresetPayload(item.payload);
+
+  if (!parsed.ok) {
+    return (
+      <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+        Custom preset payload. Use Show JSON for full details.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <span className="badge badge-blue">bulk selection</span>
+        <span className="badge badge-gray">env: {parsed.environmentName ?? parsed.environmentId ?? 'n/a'}</span>
+        <span className="badge badge-green">{parsed.artifactIds.length} elements</span>
+      </div>
+
+      <div style={{ color: 'var(--text-mid)', fontSize: 12 }}>
+        {parsed.artifactIds.slice(0, 8).map((x) => x.id).join(', ')}
+        {parsed.artifactIds.length > 8 ? ' ...' : ''}
+      </div>
+    </div>
+  );
+}
+
+function parsePresetPayload(payload: unknown):
+  | {
+      ok: true;
+      environmentId: string | null;
+      environmentName: string | null;
+      artifactIds: Array<{ id: string; type?: string }>;
+    }
+  | { ok: false } {
+  if (!payload || typeof payload !== 'object') return { ok: false };
+
+  const value = payload as {
+    kind?: string;
+    environmentId?: string;
+    environmentName?: string | null;
+    artifactIds?: Array<{ id: string; type?: string }>;
+  };
+
+  if (value.kind !== 'artifact-bulk-selection' || !Array.isArray(value.artifactIds)) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    environmentId: value.environmentId ?? null,
+    environmentName: value.environmentName ?? null,
+    artifactIds: value.artifactIds,
+  };
 }
