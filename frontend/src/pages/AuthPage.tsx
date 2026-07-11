@@ -18,6 +18,10 @@ export default function AuthPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const showEmailField = mode !== 'reset';
+  const showPasswordField = mode !== 'forgot';
+  const showConfirmPasswordField = mode === 'reset';
+
   useEffect(() => {
     const hash = window.location.hash.toLowerCase();
     if (hash.includes('type=recovery')) {
@@ -74,7 +78,7 @@ export default function AuthPage() {
         </div>
 
         <div style={{ display: 'grid', gap: 10 }}>
-          {mode !== 'reset' && (
+          {showEmailField && (
             <input
               className="field"
               placeholder="Email"
@@ -83,14 +87,16 @@ export default function AuthPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           )}
-          <input
-            className="field"
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {mode === 'reset' && (
+          {showPasswordField && (
+            <input
+              className="field"
+              placeholder="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
+          {showConfirmPasswordField && (
             <input
               className="field"
               placeholder="Confirm password"
@@ -105,9 +111,9 @@ export default function AuthPage() {
             className="btn btn-primary"
             disabled={
               loading ||
-              (mode !== 'reset' && !email) ||
-              !password ||
-              (mode === 'reset' && !confirmPassword)
+              ((mode === 'signin' || mode === 'signup') && (!email || !password)) ||
+              (mode === 'forgot' && !email) ||
+              (mode === 'reset' && (!password || !confirmPassword))
             }
             onClick={onSubmit}
           >
