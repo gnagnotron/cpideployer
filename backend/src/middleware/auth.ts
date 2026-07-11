@@ -46,6 +46,20 @@ export async function authRequired(req: Request, res: Response, next: NextFuncti
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
+    const fullNameFromMetadata =
+      (data.user.user_metadata?.full_name as string | undefined) ??
+      (data.user.user_metadata?.name as string | undefined) ??
+      null;
+
+    await supabaseAdminClient.from('profiles').upsert(
+      {
+        user_id: data.user.id,
+        email: data.user.email ?? null,
+        full_name: fullNameFromMetadata,
+      },
+      { onConflict: 'user_id' }
+    );
+
     const memberships = await loadMemberships(data.user.id);
     const auth: AuthContext = {
       userId: data.user.id,

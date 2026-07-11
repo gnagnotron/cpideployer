@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listAudit, listOrganizationMembers, updateOrganizationMemberRole } from '../api/client';
+import { getCurrentUser, listAudit, listOrganizationMembers, updateOrganizationMemberRole } from '../api/client';
 import type { OrgRole } from '../types';
 
 export default function AdminPage() {
@@ -8,6 +8,11 @@ export default function AdminPage() {
   const { data: members = [] } = useQuery({
     queryKey: ['organization-members'],
     queryFn: listOrganizationMembers,
+  });
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: getCurrentUser,
   });
 
   const { data: audit = [] } = useQuery({
@@ -21,9 +26,21 @@ export default function AdminPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['organization-members'] }),
   });
 
+  const activeOrgId = localStorage.getItem('cpideployer.activeOrgId');
+  const myMembership = me?.memberships?.find((m) => m.organizationId === activeOrgId);
+  const canManageRoles = myMembership?.role === 'owner' || myMembership?.role === 'admin';
+
   return (
     <div style={{ padding: 24, display: 'grid', gap: 20 }}>
       <h2 style={{ margin: 0 }}>Backoffice</h2>
+
+      <div className="panel" style={{ borderRadius: 6, padding: 12 }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Current user</div>
+        <div>{me?.email ?? 'Unknown user'}</div>
+        <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+          Role in org: {myMembership?.role ?? 'n/a'}
+        </div>
+      </div>
 
       <div className="panel" style={{ borderRadius: 6, overflow: 'hidden' }}>
         <div style={{ padding: 12, borderBottom: '1px solid var(--border)', fontWeight: 600 }}>Members</div>
@@ -50,7 +67,7 @@ export default function AdminPage() {
                       <button
                         key={role}
                         className="btn btn-ghost"
-                        disabled={m.role === role || roleMut.isPending}
+                        disabled={!canManageRoles || m.role === role || roleMut.isPending}
                         onClick={() => roleMut.mutate({ memberId: m.id, role })}
                       >
                         {role}

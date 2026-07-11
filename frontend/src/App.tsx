@@ -14,11 +14,13 @@ import {
 } from './api/client';
 import { useMemo, useState } from 'react';
 
-const navItems = [
+type NavItem = { to: string; label: string; end: boolean; adminOnly?: boolean };
+
+const navItems: NavItem[] = [
   { to: '/', label: 'Environments', end: true },
   { to: '/operations', label: 'Operations', end: false },
   { to: '/presets', label: 'Presets', end: false },
-  { to: '/admin', label: 'Backoffice', end: false },
+  { to: '/admin', label: 'Backoffice', end: false, adminOnly: true },
 ];
 
 export default function App() {
@@ -54,6 +56,7 @@ export default function App() {
   }, [memberships]);
 
   const activeMembership = memberships.find((m) => m.organizationId === activeOrgId) ?? null;
+  const canAccessAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
   if (authLoading) {
     return <LoadingScreen label="Loading authentication..." />;
@@ -107,7 +110,9 @@ export default function App() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '0 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navItems.map((item) => (
+          {navItems
+            .filter((item) => !item.adminOnly || canAccessAdmin)
+            .map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -127,7 +132,7 @@ export default function App() {
             >
               {item.label}
             </NavLink>
-          ))}
+            ))}
         </nav>
 
         {/* Footer */}
@@ -170,7 +175,7 @@ export default function App() {
           <Route path="/environments" element={<EnvironmentsPage />} />
           <Route path="/operations" element={<OperationsPage />} />
           <Route path="/presets" element={<PresetsPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={canAccessAdmin ? <AdminPage /> : <UnauthorizedPage />} />
         </Routes>
       </main>
     </div>
@@ -224,6 +229,19 @@ function OnboardingScreen({
             {isLoading ? 'Saving...' : 'Enter workspace'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function UnauthorizedPage() {
+  return (
+    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24 }}>
+      <div className="panel" style={{ maxWidth: 520, borderRadius: 8, padding: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Backoffice Restricted</h3>
+        <p style={{ marginBottom: 0, color: 'var(--text-dim)' }}>
+          Backoffice is available only for organization owners and admins.
+        </p>
       </div>
     </div>
   );

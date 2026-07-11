@@ -399,23 +399,62 @@ router.get('/audit', requireOrgRoles(['owner', 'admin']), async (req: Request, r
   return res.json(data ?? []);
 });
 
-router.get('/admin/members', async (req: Request, res: Response) => {
+router.get('/admin/members', requireOrgRoles(['owner', 'admin']), async (req: Request, res: Response) => {
   const { data, error } = await supabaseAdminClient
     .from('organization_members')
-    .select('id, role, created_at, user_id, profiles(full_name, email)')
+    .select('id, role, created_at, user_id')
     .eq('organization_id', req.org!.id)
     .order('created_at', { ascending: true });
 
   if (error) return res.status(500).json({ error: error.message });
 
-  return res.json((data ?? []).map((row: any) => ({
-    id: row.id,
-    userId: row.user_id,
-    role: row.role,
-    createdAt: row.created_at,
-    email: row.profiles?.email ?? null,
-    fullName: row.profiles?.full_name ?? null,
-  })));
+  const members = data ?? [];
+  const userIds = members.map((row: any) => row.user_id as string);
+
+  const { data: profileRows } = await supabaseAdminClient
+    .from('profiles')
+    .select('user_id, email, full_name')
+    .in('user_id', userIds);
+
+  const profileByUserId = new Map<string, { email: string | null; full_name: string | null }>();
+  for (const row of profileRows ?? []) {
+    profileByUserId.set(row.user_id as string, {
+      email: (row.email as string | null) ?? null,
+      full_name: (row.full_name as string | null) ?? null,
+    });
+  }
+
+  const authFallbackByUserId = new Map<string, { email: string | null; fullName: string | null }>();
+  for (const userId of userIds) {
+    const profile = profileByUserId.get(userId);
+    if (profile?.email || profile?.full_name) continue;
+
+    const { data: userData } = await supabaseAdminClient.auth.admin.getUserById(userId);
+    const email = userData.user?.email ?? null;
+    const fullName =
+      (userData.user?.user_metadata?.full_name as string | undefined) ??
+      (userData.user?.user_metadata?.name as string | undefined) ??
+      null;
+
+    authFallbackByUserId.set(userId, { email, fullName });
+  }
+
+  return res.json(
+    members.map((row: any) => {
+      const userId = row.user_id as string;
+      const profile = profileByUserId.get(userId);
+      const fallback = authFallbackByUserId.get(userId);
+
+      return {
+        id: row.id,
+        userId,
+        role: row.role,
+        createdAt: row.created_at,
+        email: profile?.email ?? fallback?.email ?? null,
+        fullName: profile?.full_name ?? fallback?.fullName ?? null,
+      };
+    })
+  );
 });
 
 router.patch('/admin/members/:id/role', requireOrgRoles(['owner', 'admin']), async (req: Request, res: Response) => {
