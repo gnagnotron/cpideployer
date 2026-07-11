@@ -104,7 +104,8 @@ alter table public.audit_logs enable row level security;
 
 -- Members can see their own organization records. Backend currently uses service role,
 -- but policies protect data if direct DB access is introduced later.
-create policy if not exists organizations_member_read on public.organizations
+drop policy if exists organizations_member_read on public.organizations;
+create policy organizations_member_read on public.organizations
 for select to authenticated
 using (
   exists (
@@ -114,16 +115,19 @@ using (
   )
 );
 
-create policy if not exists profiles_self_read on public.profiles
+drop policy if exists profiles_self_read on public.profiles;
+create policy profiles_self_read on public.profiles
 for select to authenticated
 using (user_id = auth.uid());
 
-create policy if not exists profiles_self_write on public.profiles
+drop policy if exists profiles_self_write on public.profiles;
+create policy profiles_self_write on public.profiles
 for all to authenticated
 using (user_id = auth.uid())
 with check (user_id = auth.uid());
 
-create policy if not exists organization_members_member_read on public.organization_members
+drop policy if exists organization_members_member_read on public.organization_members;
+create policy organization_members_member_read on public.organization_members
 for select to authenticated
 using (
   exists (
@@ -133,7 +137,8 @@ using (
   )
 );
 
-create policy if not exists environments_member_read on public.environments
+drop policy if exists environments_member_read on public.environments;
+create policy environments_member_read on public.environments
 for select to authenticated
 using (
   exists (
@@ -143,7 +148,8 @@ using (
   )
 );
 
-create policy if not exists presets_member_read on public.presets
+drop policy if exists presets_member_read on public.presets;
+create policy presets_member_read on public.presets
 for select to authenticated
 using (
   exists (
@@ -153,7 +159,8 @@ using (
   )
 );
 
-create policy if not exists audit_member_read on public.audit_logs
+drop policy if exists audit_member_read on public.audit_logs;
+create policy audit_member_read on public.audit_logs
 for select to authenticated
 using (
   exists (
