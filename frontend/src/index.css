@@ -58,6 +58,11 @@ body {
 @keyframes dash {
   to { stroke-dashoffset: -20; }
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .connector-animated {
   animation: dash 1.5s linear infinite;
 }

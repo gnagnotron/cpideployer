@@ -104,6 +104,7 @@ export default function OperationsPage() {
   }, [artifacts, search]);
 
   const runtimeSet = useMemo(() => new Set(runtime.map((r) => r.Id)), [runtime]);
+  const isLoadingCpiData = artifactsLoading || deployMut.isPending || undeployMut.isPending;
 
   function toggleSelection(id: string) {
     setSelectedIds((prev) => {
@@ -208,9 +209,47 @@ export default function OperationsPage() {
             Save selection as preset
           </button>
         </div>
+
+        {environmentId && (artifactsLoading || deployMut.isPending || undeployMut.isPending) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              color: 'var(--text-mid)',
+              fontSize: 12,
+            }}
+          >
+            <span
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                border: '2px solid var(--border)',
+                borderTopColor: 'var(--amber)',
+                display: 'inline-block',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+            <span>
+              {artifactsLoading
+                ? packageId
+                  ? 'Loading selected package artifacts...'
+                  : 'Loading artifacts from all packages...'
+                : deployMut.isPending
+                  ? 'Deploy operation in progress...'
+                  : 'Undeploy operation in progress...'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="panel" style={{ borderRadius: 6, overflow: 'hidden' }}>
+        {environmentId && isLoadingCpiData && (
+          <div style={{ padding: 10, borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 12 }}>
+            Please wait, CPI is responding...
+          </div>
+        )}
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
