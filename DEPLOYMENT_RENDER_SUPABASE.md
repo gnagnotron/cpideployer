@@ -56,7 +56,7 @@ You can deploy with only one Render Web Service.
 Service config:
 - Type: Web Service
 - Root Directory: repository root
-- Build Command: `npm ci && npm run build`
+- Build Command: `npm ci --include=dev && npm run build`
 - Start Command: `npm run start`
 
 Environment variables for this single service:
