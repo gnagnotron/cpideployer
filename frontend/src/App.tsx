@@ -1,8 +1,5 @@
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import DashboardPage from './pages/DashboardPage';
-import NewMappingPage from './pages/NewMappingPage';
-import TemplatesPage from './pages/TemplatesPage';
 import EnvironmentsPage from './pages/EnvironmentsPage';
 import PresetsPage from './pages/PresetsPage';
 import AdminPage from './pages/AdminPage';
@@ -17,9 +14,7 @@ import {
 import { useMemo, useState } from 'react';
 
 const navItems = [
-  { to: '/', label: 'Mappings', end: true },
-  { to: '/new', label: 'New', end: false },
-  { to: '/templates', label: 'Templates', end: false },
+  { to: '/', label: 'Environments', end: true },
   { to: '/environments', label: 'Environments', end: false },
   { to: '/presets', label: 'Presets', end: false },
   { to: '/admin', label: 'Backoffice', end: false },
@@ -170,9 +165,7 @@ export default function App() {
       {/* ── Main content ────────────────────────────────────────────── */}
       <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/new" element={<NewMappingPage />} />
-          <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/" element={<EnvironmentsPage />} />
           <Route path="/environments" element={<EnvironmentsPage />} />
           <Route path="/presets" element={<PresetsPage />} />
           <Route path="/admin" element={<AdminPage />} />
