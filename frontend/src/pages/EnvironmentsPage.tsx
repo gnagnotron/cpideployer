@@ -25,6 +25,7 @@ export default function EnvironmentsPage() {
   const [editTokenUrl, setEditTokenUrl] = useState('');
   const [editClientId, setEditClientId] = useState('');
   const [editServiceKey, setEditServiceKey] = useState('');
+  const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
   const createMut = useMutation({
     mutationFn: createEnvironment,
@@ -99,6 +100,32 @@ export default function EnvironmentsPage() {
     updateMut.mutate({ id: editingId, payload });
   }
 
+  function parseCreateServiceKey() {
+    const parsed = parseServiceKeyInput(serviceKey);
+    if (!parsed.ok) {
+      setFeedback({ type: 'err', msg: parsed.error });
+      return;
+    }
+    setName(parsed.value.name);
+    setBaseUrl(parsed.value.baseUrl);
+    setTokenUrl(parsed.value.tokenUrl);
+    setClientId(parsed.value.clientId);
+    setFeedback({ type: 'ok', msg: 'Service key parsed. Verify fields and save.' });
+  }
+
+  function parseEditServiceKey() {
+    const parsed = parseServiceKeyInput(editServiceKey);
+    if (!parsed.ok) {
+      setFeedback({ type: 'err', msg: parsed.error });
+      return;
+    }
+    setEditName(parsed.value.name);
+    setEditBaseUrl(parsed.value.baseUrl);
+    setEditTokenUrl(parsed.value.tokenUrl);
+    setEditClientId(parsed.value.clientId);
+    setFeedback({ type: 'ok', msg: 'Service key parsed for editing. Save changes when ready.' });
+  }
+
   return (
     <div style={{ padding: 24, display: 'grid', gap: 20 }}>
       <div>
@@ -107,6 +134,19 @@ export default function EnvironmentsPage() {
           Le service key vengono salvate in DB cifrate lato backend.
         </p>
       </div>
+
+      {feedback && (
+        <div
+          className="panel"
+          style={{
+            padding: '10px 12px',
+            borderRadius: 6,
+            color: feedback.type === 'ok' ? 'var(--green)' : 'var(--red)',
+          }}
+        >
+          {feedback.msg}
+        </div>
+      )}
 
       <div className="panel" style={{ padding: 16, borderRadius: 6, display: 'grid', gap: 10 }}>
         <div style={{ fontWeight: 600 }}>Nuovo ambiente</div>
@@ -123,7 +163,10 @@ export default function EnvironmentsPage() {
           value={serviceKey}
           onChange={(e) => setServiceKey(e.target.value)}
         />
-        <div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={parseCreateServiceKey} disabled={!serviceKey.trim()}>
+            Parse service key
+          </button>
           <button
             className="btn btn-primary"
             onClick={() => createMut.mutate({ name, baseUrl, tokenUrl, clientId, serviceKey })}
@@ -180,6 +223,9 @@ export default function EnvironmentsPage() {
             onChange={(e) => setEditServiceKey(e.target.value)}
           />
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={parseEditServiceKey} disabled={!editServiceKey.trim()}>
+              Parse service key
+            </button>
             <button className="btn btn-primary" onClick={submitEdit} disabled={updateMut.isPending}>
               {updateMut.isPending ? 'Saving...' : 'Save changes'}
             </button>
@@ -189,4 +235,70 @@ export default function EnvironmentsPage() {
       )}
     </div>
   );
+}
+
+function parseServiceKeyInput(input: string):
+  | {
+      ok: true;
+      value: {
+        name: string;
+        baseUrl: string;
+        tokenUrl: string;
+        clientId: string;
+      };
+    }
+  | { ok: false; error: string } {
+  if (!input.trim()) return { ok: false, error: 'Service key is empty.' };
+
+  try {
+    let json = JSON.parse(input);
+    if (json.oauth && typeof json.oauth === 'object') {
+      json = json.oauth;
+    }
+
+    const clientId = (json.clientid || json.client_id || json.clientId || '').toString();
+    const tokenUrlRaw = (json.tokenurl || json.token_url || json.tokenUrl || '').toString();
+    const baseUrlRaw = (json.apiurl || json.api_url || json.apiUrl || json.url || '').toString();
+
+    if (!clientId || !tokenUrlRaw) {
+      return {
+        ok: false,
+        error:
+          'Service key missing required fields. Expected at least clientid (or client_id) and tokenurl (or token_url).',
+      };
+    }
+
+    let baseUrl = baseUrlRaw;
+    let tenantName = '';
+
+    if (!baseUrl) {
+      const tokenHost = new URL(tokenUrlRaw).hostname;
+      const tenantId = tokenHost.split('.')[0] ?? '';
+      baseUrl = `https://${tenantId}.it-cpi.cloud.sap`;
+      tenantName = tenantId;
+    } else {
+      try {
+        const host = new URL(baseUrl).hostname;
+        tenantName = host.split('.')[0] ?? '';
+      } catch {
+        tenantName = '';
+      }
+    }
+
+    if (!tenantName || tenantName === 'https') {
+      tenantName = `Tenant-${Date.now()}`;
+    }
+
+    return {
+      ok: true,
+      value: {
+        name: tenantName,
+        baseUrl: baseUrl.replace(/\/$/, ''),
+        tokenUrl: tokenUrlRaw.replace(/\/$/, ''),
+        clientId,
+      },
+    };
+  } catch (error) {
+    return { ok: false, error: `Invalid JSON: ${(error as Error).message}` };
+  }
 }

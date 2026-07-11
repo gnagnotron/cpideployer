@@ -15,7 +15,6 @@ import { useMemo, useState } from 'react';
 
 const navItems = [
   { to: '/', label: 'Environments', end: true },
-  { to: '/environments', label: 'Environments', end: false },
   { to: '/presets', label: 'Presets', end: false },
   { to: '/admin', label: 'Backoffice', end: false },
 ];
