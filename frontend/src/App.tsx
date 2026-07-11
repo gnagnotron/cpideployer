@@ -4,6 +4,7 @@ import EnvironmentsPage from './pages/EnvironmentsPage';
 import PresetsPage from './pages/PresetsPage';
 import AdminPage from './pages/AdminPage';
 import OperationsPage from './pages/OperationsPage';
+import AccountPage from './pages/AccountPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './auth/AuthProvider';
 import {
@@ -20,11 +21,12 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Environments', end: true },
   { to: '/operations', label: 'Operations', end: false },
   { to: '/presets', label: 'Presets', end: false },
+  { to: '/account', label: 'Account', end: false },
   { to: '/admin', label: 'Backoffice', end: false, adminOnly: true },
 ];
 
 export default function App() {
-  const { session, isLoading: authLoading, signOut } = useAuth();
+  const { session, isLoading: authLoading, signOut, isPasswordRecovery, clearPasswordRecovery } = useAuth();
   const qc = useQueryClient();
 
   const meQuery = useQuery({
@@ -170,13 +172,18 @@ export default function App() {
 
       {/* ── Main content ────────────────────────────────────────────── */}
       <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        <Routes>
-          <Route path="/" element={<EnvironmentsPage />} />
-          <Route path="/environments" element={<EnvironmentsPage />} />
-          <Route path="/operations" element={<OperationsPage />} />
-          <Route path="/presets" element={<PresetsPage />} />
-          <Route path="/admin" element={canAccessAdmin ? <AdminPage /> : <UnauthorizedPage />} />
-        </Routes>
+        {isPasswordRecovery ? (
+          <AccountPage forceReset onPasswordUpdated={clearPasswordRecovery} />
+        ) : (
+          <Routes>
+            <Route path="/" element={<EnvironmentsPage />} />
+            <Route path="/environments" element={<EnvironmentsPage />} />
+            <Route path="/operations" element={<OperationsPage />} />
+            <Route path="/presets" element={<PresetsPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/admin" element={canAccessAdmin ? <AdminPage /> : <UnauthorizedPage />} />
+          </Routes>
+        )}
       </main>
     </div>
   );

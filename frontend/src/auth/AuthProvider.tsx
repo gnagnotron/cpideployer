@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 interface AuthContextShape {
   session: Session | null;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -19,9 +21,15 @@ const AuthContext = createContext<AuthContextShape | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes('type=recovery')) {
+      setIsPasswordRecovery(true);
+    }
 
     supabase.auth.getSession().then(({ data }) => {
       if (mounted) {
@@ -30,8 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
     });
 
     return () => {
@@ -43,6 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextShape>(() => ({
     session,
     isLoading,
+    isPasswordRecovery,
+    clearPasswordRecovery: () => setIsPasswordRecovery(false),
     signInWithPassword: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
@@ -73,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-  }), [session, isLoading]);
+  }), [session, isLoading, isPasswordRecovery]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
