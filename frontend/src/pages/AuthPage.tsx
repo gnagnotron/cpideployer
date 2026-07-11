@@ -1,22 +1,55 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 
 export default function AuthPage() {
-  const { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithAzure } = useAuth();
+  const {
+    signInWithPassword,
+    signUpWithPassword,
+    signInWithGoogle,
+    signInWithAzure,
+    requestPasswordReset,
+    updatePassword,
+  } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignup, setIsSignup] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes('type=recovery')) {
+      setMode('reset');
+    }
+  }, []);
 
   async function onSubmit() {
     setError(null);
+    setMessage(null);
     setLoading(true);
     try {
-      if (isSignup) {
+      if (mode === 'signup') {
         await signUpWithPassword(email, password);
-      } else {
+        setMessage('Account created. Check your email for confirmation if required.');
+      } else if (mode === 'signin') {
         await signInWithPassword(email, password);
+      } else if (mode === 'forgot') {
+        await requestPasswordReset(email);
+        setMessage('Password reset email sent. Check your inbox.');
+      } else {
+        if (!password || password.length < 8) {
+          throw new Error('Password must be at least 8 characters');
+        }
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match');
+        }
+        await updatePassword(password);
+        setMessage('Password updated. You can now sign in.');
+        setMode('signin');
+        setPassword('');
+        setConfirmPassword('');
       }
     } catch (err) {
       setError((err as Error).message);
@@ -32,17 +65,24 @@ export default function AuthPage() {
           <div style={{ color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             CPI Deployer
           </div>
-          <h1 style={{ margin: '6px 0 0', fontSize: 20 }}>{isSignup ? 'Create account' : 'Sign in'}</h1>
+          <h1 style={{ margin: '6px 0 0', fontSize: 20 }}>
+            {mode === 'signup' && 'Create account'}
+            {mode === 'signin' && 'Sign in'}
+            {mode === 'forgot' && 'Forgot password'}
+            {mode === 'reset' && 'Set new password'}
+          </h1>
         </div>
 
         <div style={{ display: 'grid', gap: 10 }}>
-          <input
-            className="field"
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          {mode !== 'reset' && (
+            <input
+              className="field"
+              placeholder="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          )}
           <input
             className="field"
             placeholder="Password"
@@ -50,28 +90,73 @@ export default function AuthPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          {mode === 'reset' && (
+            <input
+              className="field"
+              placeholder="Confirm password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          )}
           {error && <div style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
-          <button className="btn btn-primary" disabled={loading || !email || !password} onClick={onSubmit}>
-            {loading ? 'Please wait...' : isSignup ? 'Create account' : 'Sign in'}
+          {message && <div style={{ color: 'var(--green)', fontSize: 12 }}>{message}</div>}
+          <button
+            className="btn btn-primary"
+            disabled={
+              loading ||
+              (mode !== 'reset' && !email) ||
+              !password ||
+              (mode === 'reset' && !confirmPassword)
+            }
+            onClick={onSubmit}
+          >
+            {loading
+              ? 'Please wait...'
+              : mode === 'signup'
+              ? 'Create account'
+              : mode === 'signin'
+              ? 'Sign in'
+              : mode === 'forgot'
+              ? 'Send reset email'
+              : 'Update password'}
           </button>
         </div>
+
+        {(mode === 'signin' || mode === 'signup') && (
+          <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={() => void signInWithGoogle()}>
+              Continue with Google
+            </button>
+            <button className="btn btn-ghost" onClick={() => void signInWithAzure()}>
+              Continue with Microsoft
+            </button>
+          </div>
+        )}
 
         <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => void signInWithGoogle()}>
-            Continue with Google
-          </button>
-          <button className="btn btn-ghost" onClick={() => void signInWithAzure()}>
-            Continue with Microsoft
-          </button>
-        </div>
+          {mode !== 'reset' && (
+            <button
+              className="btn btn-ghost"
+              style={{ width: '100%' }}
+              onClick={() => setMode((m) => (m === 'signup' ? 'signin' : 'signup'))}
+            >
+              {mode === 'signup' ? 'Already have an account? Sign in' : 'Need an account? Register'}
+            </button>
+          )}
 
-        <button
-          className="btn btn-ghost"
-          style={{ marginTop: 14, width: '100%' }}
-          onClick={() => setIsSignup((v) => !v)}
-        >
-          {isSignup ? 'Already have an account? Sign in' : 'Need an account? Register'}
-        </button>
+          {mode === 'signin' && (
+            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={() => setMode('forgot')}>
+              Forgot password?
+            </button>
+          )}
+
+          {mode === 'forgot' && (
+            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={() => setMode('signin')}>
+              Back to sign in
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

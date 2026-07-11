@@ -7,6 +7,8 @@ interface AuthContextShape {
   isLoading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithAzure: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -47,6 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     signUpWithPassword: async (email, password) => {
       const { error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+    },
+    requestPasswordReset: async (email) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+    },
+    updatePassword: async (newPassword) => {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
     },
     signInWithGoogle: async () => {
