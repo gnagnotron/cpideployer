@@ -1,0 +1,33 @@
+{
+  "name": "SAP CPI Deployer",
+  "version": "1.0.0",
+  "description": "Bulk deploy/undeploy SAP CPI iFlows and artifacts from Chrome",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "SAP CPI Deployer"
+  },
+  "options_page": "src/options/index.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.it-cpi.cloud.sap/*",
+    "https://*.authentication.sap.hana.ondemand.com/*",
+    "https://*.hana.ondemand.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
